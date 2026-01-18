@@ -79,7 +79,8 @@ Vue.createApp({
     const dd = String(today.getDate()).padStart(2, '0');
     return {
       newDate: `${yyyy}-${mm}-${dd}`,
-      newTime: '',
+      // set now time + 5 sec for test purpose
+      newTime: new Date(today.getTime() + 5000).toTimeString().split(' ')[0],
       newMessage: '',
       notifications: [],
       isSpeaking: false,
