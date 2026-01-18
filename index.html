@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <title>Notifikasi Jam</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body class="bg-gray-100 p-6">
+
+<div id="app" class="max-w-3xl mx-auto bg-white p-6 rounded shadow">
+  <!-- Template Quick Add -->
+  <div class="mb-4">
+    <div class="mb-2 font-semibold">Template Cepat:</div>
+    <div class="flex flex-wrap gap-2">
+      <button
+        v-for="(tpl, i) in templates"
+        :key="i"
+        @click="addTemplateToTable(tpl)"
+        class="bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded text-sm"
+      >
+        {{ tpl.label }}
+      </button>
+    </div>
+  </div>
+
+  <div class="flex gap-3 mb-4">
+    <input type="date" v-model="newDate" class="border px-3 py-2 rounded">
+    <input type="time" step="1" v-model="newTime" class="border px-3 py-2 rounded">
+    <input type="text" v-model="newMessage" placeholder="Pesan (opsional, {h}:{mn}:{sec})" class="border px-3 py-2 rounded flex-1">
+    <button @click="addNotification" class="bg-blue-600 text-white px-4 py-2 rounded">
+      Tambah
+    </button>
+    <button
+      @click="stopSpeech"
+      class="bg-red-600 text-white px-4 py-2 rounded"
+      v-if="isSpeaking"
+    >
+      Stop
+    </button>
+  </div>
+
+  <table class="w-full border">
+    <thead class="bg-gray-200">
+      <tr>
+        <th class="border p-2">Jam</th>
+        <th class="border p-2">Tanggal</th>
+        <th class="border p-2">Pesan</th>
+        <th class="border p-2">Countdown</th>
+        <th class="border p-2">Aksi</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr v-for="(n, i) in notifications" :key="i">
+        <td class="border p-2 text-center">{{ n.time }}</td>
+        <td class="border p-2 text-center">{{ n.date }}</td>
+        <td class="border p-2 text-center">
+          <input
+            v-model="n.message"
+            class="border rounded px-2 py-1 w-full"
+            placeholder="Pesan (opsional, {h}:{mn}:{sec})"
+          />
+        </td>
+        <td class="border p-2 text-center">{{ format(n.remaining) }}</td>
+        <td class="border p-2 text-center">
+          <button @click="notifications.splice(i,1)" class="text-red-600">Hapus</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+Vue.createApp({
+  data() {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return {
+      newDate: `${yyyy}-${mm}-${dd}`,
+      newTime: '',
+      newMessage: '',
+      notifications: [],
+      isSpeaking: false,
+      speakingIndex: null,
+      loopUtterance: null,
+      templates: [
+        {
+          label: 'Hari ini 04:00 - Matikan semua lampu',
+          date: `${yyyy}-${mm}-${dd}`,
+          time: '04:00:00',
+          message: 'Matikan semua lampu'
+        },
+        {
+          label: 'Hari ini 06:00 - Belanja online',
+          date: `${yyyy}-${mm}-${dd}`,
+          time: '06:00:00',
+          message: 'Belanja online'
+        },
+        {
+          label: 'Hari ini 07:00 - Sarapan',
+          date: `${yyyy}-${mm}-${dd}`,
+          time: '07:00:00',
+          message: 'Saatnya sarapan'
+        },
+        {
+          label: 'Hari ini 12:00 - Makan siang',
+          date: `${yyyy}-${mm}-${dd}`,
+          time: '12:00:00',
+          message: 'Saatnya makan siang'
+        },
+        {
+          label: 'Hari ini 18:00 - Masak makan malam',
+          date: `${yyyy}-${mm}-${dd}`,
+          time: '18:00:00',
+          message: 'Masak makan malam'
+        },
+        {
+          label: 'Hari ini 21:00 - Cuci piring',
+          date: `${yyyy}-${mm}-${dd}`,
+          time: '21:00:00',
+          message: 'Cuci piring sebelum tidur'
+        },
+        {
+          label: 'Hari ini 22:30 - Siapkan alarm & kunci pintu',
+          date: `${yyyy}-${mm}-${dd}`,
+          time: '22:30:00',
+          message: 'Siapkan alarm dan kunci pintu'
+        }
+      ]
+    }
+  },
+  methods: {
+    addNotification() {
+      if (!this.newTime) return
+      const [h, m, s] = this.newTime.split(':').map(Number)
+      let [year, month, day] = this.newDate
+        ? this.newDate.split('-').map(Number)
+        : (() => {
+            const now = new Date();
+            return [now.getFullYear(), now.getMonth() + 1, now.getDate()];
+          })();
+      const target = new Date(year, month - 1, day, h, m, s)
+      this.notifications.push({
+        time: this.newTime,
+        date: this.newDate,
+        message: this.newMessage,
+        target,
+        remaining: target - Date.now(),
+        fired: false
+      })
+      this.newTime = ''
+      this.newMessage = ''
+    },
+    format(ms) {
+      if (ms <= 0) return '00:00:00'
+      const t = Math.floor(ms / 1000)
+      const h = String(Math.floor(t / 3600)).padStart(2,'0')
+      const m = String(Math.floor((t % 3600) / 60)).padStart(2,'0')
+      const s = String(t % 60).padStart(2,'0')
+      return `${h}:${m}:${s}`
+    },
+    formatMessage(template, h, mn, sec) {
+      return template
+        .replace('{h}', h)
+        .replace('{mn}', mn)
+        .replace('{sec}', sec)
+    },
+    playLoop(n, idx) {
+      if (this.speakingIndex !== null) return; // Only one at a time
+      this.isSpeaking = true;
+      this.speakingIndex = idx;
+      const [h, mn, sec] = n.time.split(':').map(x => x.padStart(2, '0'));
+      let msg = n.message && n.message.trim()
+        ? `Sekarang jam ${h}:${mn}. ${this.formatMessage(n.message, h, mn, sec)}`
+        : `Sekarang jam ${h}:${mn}`;
+      const speak = () => {
+        if (this.speakingIndex !== idx) return;
+        const u = new SpeechSynthesisUtterance(msg);
+        u.lang = 'id-ID';
+        u.onend = () => {
+          if (this.speakingIndex === idx) {
+            this.loopUtterance = setTimeout(speak, 500);
+          }
+        };
+        speechSynthesis.speak(u);
+      };
+      speak();
+    },
+    stopSpeech() {
+      this.isSpeaking = false;
+      this.speakingIndex = null;
+      speechSynthesis.cancel();
+      if (this.loopUtterance) {
+        clearTimeout(this.loopUtterance);
+        this.loopUtterance = null;
+      }
+    },
+    addTemplateToTable(tpl) {
+      // Add template directly to notifications table
+      const [h, m, s] = tpl.time.split(':').map(Number)
+      let [year, month, day] = tpl.date
+        ? tpl.date.split('-').map(Number)
+        : (() => {
+            const now = new Date();
+            return [now.getFullYear(), now.getMonth() + 1, now.getDate()];
+          })();
+      const target = new Date(year, month - 1, day, h, m, s)
+      this.notifications.push({
+        time: tpl.time,
+        date: tpl.date,
+        message: tpl.message,
+        target,
+        remaining: target - Date.now(),
+        fired: false
+      })
+    },
+  },
+  mounted() {
+    setInterval(() => {
+      const now = Date.now()
+      this.notifications.forEach((n, i) => {
+        n.remaining = n.target - now
+        if (n.remaining <= 0 && !n.fired) {
+          n.fired = true
+          this.playLoop(n, i)
+        }
+      })
+    }, 1000)
+  }
+}).mount('#app')
+</script>
+
+</body>
+</html>
